@@ -52,6 +52,11 @@ git push -u origin main
 5. 点击 `Deploy`。
 6. 部署完成后，Vercel 会给出一个公网访问链接。
 
+如需启用真正的 AI 生成学习计划，请在 Vercel 项目的环境变量里添加：
+
+- `OPENAI_API_KEY`: 你的 OpenAI API Key
+- `OPENAI_MODEL`: 可选，默认使用 `gpt-4o-mini`
+
 ## 部署到 Netlify
 
 1. 打开 [Netlify](https://www.netlify.com/) 并登录。
@@ -62,3 +67,10 @@ git push -u origin main
    - Publish directory: `dist`
 5. 点击 `Deploy site`。
 6. 部署完成后，Netlify 会给出一个公网访问链接。
+
+如需启用真正的 AI 生成学习计划，请在 Netlify 项目的 `Site configuration` -> `Environment variables` 中添加：
+
+- `OPENAI_API_KEY`: 你的 OpenAI API Key
+- `OPENAI_MODEL`: 可选，默认使用 `gpt-4o-mini`
+
+如果没有设置 `OPENAI_API_KEY`，网站仍可使用，但学习计划会自动退回到本地模板生成。

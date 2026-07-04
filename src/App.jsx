@@ -218,6 +218,8 @@ function App() {
   const [dailyDuration, setDailyDuration] = useState('1小时');
   const [generatedPlan, setGeneratedPlan] = useState(savedPlan);
   const [planSaved, setPlanSaved] = useState(Boolean(savedPlan));
+  const [aiLoading, setAiLoading] = useState(false);
+  const [planError, setPlanError] = useState('');
 
   useEffect(() => {
     localStorage.setItem(todoStorageKey, JSON.stringify(todos));
@@ -293,6 +295,7 @@ function App() {
     const plan = {
       direction: planDirection,
       duration: dailyDuration,
+      source: 'local',
       createdAt: new Date().toISOString(),
       days: Array.from({ length: 7 }, (_, index) => ({
         day: index + 1,
@@ -304,6 +307,36 @@ function App() {
 
     setGeneratedPlan(plan);
     setPlanSaved(false);
+    setPlanError('');
+  }
+
+  async function generateAiStudyPlan() {
+    setAiLoading(true);
+    setPlanError('');
+
+    try {
+      const response = await fetch('/api/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course: planDirection,
+          duration: dailyDuration,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI 接口暂时不可用');
+      }
+
+      const plan = await response.json();
+      setGeneratedPlan(plan);
+      setPlanSaved(false);
+    } catch (error) {
+      generateStudyPlan();
+      setPlanError('AI 生成暂时不可用，已自动使用本地模板生成计划。');
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   function saveStudyPlan() {
@@ -350,9 +383,12 @@ function App() {
                 plannerDirections={plannerDirections}
                 generatedPlan={generatedPlan}
                 generateStudyPlan={generateStudyPlan}
+                generateAiStudyPlan={generateAiStudyPlan}
                 saveStudyPlan={saveStudyPlan}
                 planSaved={planSaved}
                 customCourse={customCourse}
+                aiLoading={aiLoading}
+                planError={planError}
               />
             )}
             {activePage === 'todos' && (
@@ -687,9 +723,12 @@ function StudyPlannerPage({
   plannerDirections,
   generatedPlan,
   generateStudyPlan,
+  generateAiStudyPlan,
   saveStudyPlan,
   planSaved,
   customCourse,
+  aiLoading,
+  planError,
 }) {
   return (
     <section className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
@@ -698,7 +737,7 @@ function StudyPlannerPage({
           <p className="text-sm font-semibold text-teal-700">计划生成器</p>
           <h2 className="mt-1 text-2xl font-bold text-slate-950">定制 7 天学习节奏</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            选择学习方向和每天可投入的时间，系统会生成包含学习内容、练习任务和复盘任务的 7 天计划。
+            选择学习方向和每天可投入的时间，AI 会生成包含学习内容、练习任务和复盘任务的 7 天计划。
           </p>
           {customCourse && (
             <p className="mt-3 rounded-lg bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
@@ -747,14 +786,29 @@ function StudyPlannerPage({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={generateStudyPlan}
-              className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-teal-300 to-sky-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition duration-300 hover:-translate-y-0.5"
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              生成计划
-            </button>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <button
+                type="button"
+                onClick={generateAiStudyPlan}
+                disabled={aiLoading}
+                className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-teal-300 to-sky-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition duration-300 hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70"
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                {aiLoading ? 'AI 生成中...' : 'AI 生成计划'}
+              </button>
+              <button
+                type="button"
+                onClick={generateStudyPlan}
+                className="focus-ring inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+              >
+                本地模板
+              </button>
+            </div>
+            {planError && (
+              <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                {planError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -776,6 +830,11 @@ function StudyPlannerPage({
             <h2 className="mt-1 text-2xl font-bold text-slate-950">
               {generatedPlan ? `${generatedPlan.direction} · ${generatedPlan.duration}/天` : '等待生成'}
             </h2>
+            {generatedPlan?.source && (
+              <p className="mt-2 text-sm text-slate-500">
+                来源：{generatedPlan.source === 'ai' ? 'AI 生成' : generatedPlan.source === 'fallback' ? 'AI 未配置，使用兜底模板' : '本地模板'}
+              </p>
+            )}
           </div>
           <button
             type="button"
