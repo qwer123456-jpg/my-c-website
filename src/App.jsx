@@ -22,12 +22,7 @@ const todoStorageKey = 'student-study-toolbox.todos';
 const planStorageKey = 'student-study-toolbox.study-plan';
 const courseStorageKey = 'student-study-toolbox.custom-course';
 
-const initialTodos = [
-  { id: 'todo-1', text: '复习线性代数特征值与二次型', done: false },
-  { id: 'todo-2', text: '整理 Python 数据处理笔记', done: true },
-  { id: 'todo-3', text: '完成复变函数留数定理练习', done: false },
-  { id: 'todo-4', text: '复盘常微分方程错题', done: false },
-];
+const initialTodos = [];
 
 const navItems = [
   { id: 'home', label: '首页', icon: Home },
