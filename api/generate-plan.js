@@ -36,21 +36,21 @@ export default async function handler(request, response) {
     return;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.DEEPSEEK_API_KEY) {
     response.status(200).json(fallbackPlan(course, duration));
     return;
   }
 
   try {
-    const openaiResponse = await fetch('https://api.openai.com/v1/responses', {
+    const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        input: [
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+        messages: [
           {
             role: 'system',
             content:
@@ -61,16 +61,18 @@ export default async function handler(request, response) {
             content: `请为大学课程“${course}”生成 7 天学习计划。每天学习时长是“${duration}”。JSON 格式必须是：{"days":[{"day":1,"content":"学习内容","practice":"练习任务","review":"复盘任务"}]}。内容要具体、适合大学生复习。`,
           },
         ],
+        stream: false,
       }),
     });
 
-    if (!openaiResponse.ok) {
+    if (!deepseekResponse.ok) {
       response.status(200).json(fallbackPlan(course, duration));
       return;
     }
 
-    const data = await openaiResponse.json();
-    const parsed = JSON.parse(extractText(data));
+    const data = await deepseekResponse.json();
+    const text = data.choices?.[0]?.message?.content || extractText(data);
+    const parsed = JSON.parse(text);
 
     response.status(200).json({
       direction: course,

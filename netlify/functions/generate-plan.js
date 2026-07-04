@@ -50,7 +50,7 @@ export async function handler(event) {
     };
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.DEEPSEEK_API_KEY) {
     return {
       statusCode: 200,
       body: JSON.stringify(fallbackPlan(course, duration)),
@@ -58,15 +58,15 @@ export async function handler(event) {
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        input: [
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+        messages: [
           {
             role: 'system',
             content:
@@ -77,12 +77,13 @@ export async function handler(event) {
             content: `请为大学课程“${course}”生成 7 天学习计划。每天学习时长是“${duration}”。JSON 格式必须是：{"days":[{"day":1,"content":"学习内容","practice":"练习任务","review":"复盘任务"}]}。内容要具体、适合大学生复习。`,
           },
         ],
+        stream: false,
       }),
     });
 
     if (!response.ok) {
       const detail = await response.text();
-      console.error('OpenAI API error:', detail);
+      console.error('DeepSeek API error:', detail);
       return {
         statusCode: 200,
         body: JSON.stringify(fallbackPlan(course, duration)),
@@ -90,7 +91,7 @@ export async function handler(event) {
     }
 
     const data = await response.json();
-    const text = extractText(data);
+    const text = data.choices?.[0]?.message?.content || extractText(data);
     const parsed = JSON.parse(text);
 
     return {
@@ -104,7 +105,7 @@ export async function handler(event) {
       }),
     };
   } catch (error) {
-    console.error('AI plan generation failed:', error);
+    console.error('DeepSeek plan generation failed:', error);
     return {
       statusCode: 200,
       body: JSON.stringify(fallbackPlan(course, duration)),
