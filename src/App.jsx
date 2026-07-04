@@ -20,6 +20,7 @@ import {
 
 const todoStorageKey = 'student-study-toolbox.todos';
 const planStorageKey = 'student-study-toolbox.study-plan';
+const courseStorageKey = 'student-study-toolbox.custom-course';
 
 const initialTodos = [
   { id: 'todo-1', text: '复习线性代数特征值与二次型', done: false },
@@ -140,11 +141,84 @@ function loadSavedPlan() {
   }
 }
 
+function loadCustomCourse() {
+  try {
+    return localStorage.getItem(courseStorageKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+function createCourseCard(courseName) {
+  return {
+    title: courseName,
+    progress: 40,
+    focus: `${courseName} 的核心概念、常见题型、课堂笔记和错题整理`,
+    plan: `先把 ${courseName} 的章节目录拆成 3-5 个模块，再按“知识点、例题、错题、总结”推进复习。`,
+    checklist: ['章节梳理', '典型例题', '错题复盘'],
+  };
+}
+
+function createPlanTemplate(courseName) {
+  return {
+    content: [
+      `${courseName} 课程目录梳理`,
+      `${courseName} 核心概念复习`,
+      `${courseName} 课堂例题整理`,
+      `${courseName} 作业错题复盘`,
+      `${courseName} 高频题型训练`,
+      `${courseName} 知识框架总结`,
+      `${courseName} 模拟复习与查漏补缺`,
+    ],
+    practice: [
+      '列出本课程所有章节和考试范围',
+      '整理 8 个关键概念并写出解释',
+      '重做 3 道课堂例题',
+      '挑选 5 道错题重新完成',
+      '完成 1 组专题练习',
+      '画出一张课程知识结构图',
+      '做一次 45 分钟计时复习',
+    ],
+    review: [
+      '标记最薄弱的 2 个章节',
+      '记录概念混淆点',
+      '总结例题解题入口',
+      '写下错题原因和改法',
+      '归纳题型判断方法',
+      '补齐公式和方法清单',
+      '形成下一周复习安排',
+    ],
+  };
+}
+
+function createPortfolioItems(courseName) {
+  const customItem = courseName
+    ? [
+        {
+          title: `${courseName} 复习档案`,
+          category: '个性化课程',
+          description: `围绕 ${courseName} 自动生成的复习资料入口，适合放章节笔记、错题和阶段总结。`,
+          meta: '1 门课程 · 个性化生成',
+          details: [
+            `记录 ${courseName} 的章节目录和复习优先级。`,
+            `整理 ${courseName} 的课堂例题、作业错题和考试重点。`,
+            '可以作为后续上传资料、报告或截图的展示卡片。',
+          ],
+        },
+      ]
+    : [];
+
+  return [...customItem, ...portfolioItems];
+}
+
 function App() {
   const savedPlan = loadSavedPlan();
+  const savedCourse = loadCustomCourse();
   const [activePage, setActivePage] = useState('home');
   const [todos, setTodos] = useState(loadTodos);
   const [newTodo, setNewTodo] = useState('');
+  const [customCourse, setCustomCourse] = useState(savedCourse);
+  const [courseDraft, setCourseDraft] = useState(savedCourse);
   const [planDirection, setPlanDirection] = useState('Python');
   const [dailyDuration, setDailyDuration] = useState('1小时');
   const [generatedPlan, setGeneratedPlan] = useState(savedPlan);
@@ -154,10 +228,28 @@ function App() {
     localStorage.setItem(todoStorageKey, JSON.stringify(todos));
   }, [todos]);
 
+  useEffect(() => {
+    localStorage.setItem(courseStorageKey, customCourse);
+  }, [customCourse]);
+
   const completedCount = todos.filter((todo) => todo.done).length;
   const progress = todos.length ? Math.round((completedCount / todos.length) * 100) : 0;
   const todayTasks = useMemo(() => todos.filter((todo) => !todo.done).slice(0, 4), [todos]);
   const pageTitle = navItems.find((item) => item.id === activePage)?.label ?? '首页';
+  const courseList = customCourse
+    ? [createCourseCard(customCourse), ...courseCards.filter((course) => course.title !== customCourse)]
+    : courseCards;
+  const plannerDirections = customCourse
+    ? [customCourse, ...directionOptions.filter((direction) => direction !== customCourse)]
+    : directionOptions;
+  const portfolioList = createPortfolioItems(customCourse);
+  const suggestedTodos = customCourse
+    ? [
+        `整理 ${customCourse} 第一轮章节目录`,
+        `完成 ${customCourse} 3 道典型题`,
+        `复盘 ${customCourse} 本周错题`,
+      ]
+    : ['输入课程后，这里会出现对应的待办建议'];
 
   function addTodo(event) {
     event.preventDefault();
@@ -183,8 +275,26 @@ function App() {
     setTodos((currentTodos) => currentTodos.filter((todo) => todo.id !== id));
   }
 
+  function saveCourse(event) {
+    event.preventDefault();
+    const courseName = courseDraft.trim();
+    if (!courseName) return;
+
+    setCustomCourse(courseName);
+    setPlanDirection(courseName);
+    setActivePage('courses');
+  }
+
+  function addSuggestedTodo(text) {
+    if (!customCourse || !text) return;
+    setTodos((currentTodos) => [
+      { id: crypto.randomUUID(), text, done: false },
+      ...currentTodos,
+    ]);
+  }
+
   function generateStudyPlan() {
-    const template = planTemplates[planDirection];
+    const template = planTemplates[planDirection] || createPlanTemplate(planDirection);
     const plan = {
       direction: planDirection,
       duration: dailyDuration,
@@ -219,21 +329,35 @@ function App() {
             completedCount={completedCount}
             progress={progress}
             setActivePage={setActivePage}
+            customCourse={customCourse}
+            courseDraft={courseDraft}
+            setCourseDraft={setCourseDraft}
+            saveCourse={saveCourse}
           />
         ) : (
           <>
             <PageIntro title={pageTitle} />
-            {activePage === 'courses' && <CoursesPage />}
+            {activePage === 'courses' && (
+              <CoursesPage
+                courses={courseList}
+                customCourse={customCourse}
+                courseDraft={courseDraft}
+                setCourseDraft={setCourseDraft}
+                saveCourse={saveCourse}
+              />
+            )}
             {activePage === 'planner' && (
               <StudyPlannerPage
                 planDirection={planDirection}
                 setPlanDirection={setPlanDirection}
                 dailyDuration={dailyDuration}
                 setDailyDuration={setDailyDuration}
+                plannerDirections={plannerDirections}
                 generatedPlan={generatedPlan}
                 generateStudyPlan={generateStudyPlan}
                 saveStudyPlan={saveStudyPlan}
                 planSaved={planSaved}
+                customCourse={customCourse}
               />
             )}
             {activePage === 'todos' && (
@@ -246,9 +370,12 @@ function App() {
                 deleteTodo={deleteTodo}
                 completedCount={completedCount}
                 progress={progress}
+                customCourse={customCourse}
+                suggestedTodos={suggestedTodos}
+                addSuggestedTodo={addSuggestedTodo}
               />
             )}
-            {activePage === 'portfolio' && <PortfolioPage />}
+            {activePage === 'portfolio' && <PortfolioPage items={portfolioList} customCourse={customCourse} />}
           </>
         )}
       </main>
@@ -322,7 +449,48 @@ function PageIntro({ title }) {
   );
 }
 
-function HomePage({ todos, todayTasks, completedCount, progress, setActivePage }) {
+function CourseInputPanel({ customCourse, courseDraft, setCourseDraft, saveCourse }) {
+  return (
+    <form
+      onSubmit={saveCourse}
+      className="rounded-lg border border-white/70 bg-white/90 p-5 shadow-soft backdrop-blur"
+    >
+      <p className="text-sm font-semibold text-teal-700">我的课程</p>
+      <h2 className="mt-1 text-xl font-bold text-slate-950">输入课程后生成个人复习内容</h2>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <input
+          value={courseDraft}
+          onChange={(event) => setCourseDraft(event.target.value)}
+          placeholder="例如：概率论、大学物理、数据结构"
+          className="focus-ring min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 shadow-sm outline-none transition focus:border-teal-400"
+        />
+        <button
+          type="submit"
+          className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+        >
+          生成课程面板
+        </button>
+      </div>
+      <p className="mt-3 text-sm text-slate-500">
+        {customCourse
+          ? `当前课程：${customCourse}。课程复习、学习计划、待办建议和作品展示都会跟随它变化。`
+          : '还没有设置课程。输入课程名后，网站会变成你的个人复习工具。'}
+      </p>
+    </form>
+  );
+}
+
+function HomePage({
+  todos,
+  todayTasks,
+  completedCount,
+  progress,
+  setActivePage,
+  customCourse,
+  courseDraft,
+  setCourseDraft,
+  saveCourse,
+}) {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-lg border border-white/15 bg-slate-950 px-5 py-8 text-white shadow-[0_28px_90px_rgba(2,6,23,0.36)] sm:px-8 lg:px-10 lg:py-12">
@@ -399,6 +567,13 @@ function HomePage({ todos, todayTasks, completedCount, progress, setActivePage }
         <MetricCard label="完成率" value={`${progress}%`} detail="今日学习进度" icon={TrendingUp} />
       </section>
 
+      <CourseInputPanel
+        customCourse={customCourse}
+        courseDraft={courseDraft}
+        setCourseDraft={setCourseDraft}
+        saveCourse={saveCourse}
+      />
+
       <section className="grid gap-4 lg:grid-cols-4">
         {[
           ['课程复习', '集中整理专业课重点、进度和清单。', BookOpen, 'courses'],
@@ -464,38 +639,48 @@ function ProgressPanel({ progress, completedCount, total }) {
   );
 }
 
-function CoursesPage() {
+function CoursesPage({ courses, customCourse, courseDraft, setCourseDraft, saveCourse }) {
   return (
-    <section className="grid gap-5 md:grid-cols-2">
-      {courseCards.map((course) => (
-        <div key={course.title} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-soft backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-teal-700">课程复习</p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-950">{course.title}</h2>
-            </div>
-            <span className="rounded-full bg-slate-950 px-3 py-1 text-sm font-bold text-white">
-              {course.progress}%
-            </span>
-          </div>
-          <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-500"
-              style={{ width: `${course.progress}%` }}
-            />
-          </div>
-          <p className="mt-5 text-sm font-semibold text-slate-700">重点：{course.focus}</p>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{course.plan}</p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {course.checklist.map((item) => (
-              <span key={item} className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
-                {item}
+    <div className="space-y-5">
+      <CourseInputPanel
+        customCourse={customCourse}
+        courseDraft={courseDraft}
+        setCourseDraft={setCourseDraft}
+        saveCourse={saveCourse}
+      />
+      <section className="grid gap-5 md:grid-cols-2">
+        {courses.map((course) => (
+          <div key={course.title} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-soft backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-teal-700">
+                  {course.title === customCourse ? '我的课程' : '课程复习'}
+                </p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-950">{course.title}</h2>
+              </div>
+              <span className="rounded-full bg-slate-950 px-3 py-1 text-sm font-bold text-white">
+                {course.progress}%
               </span>
-            ))}
+            </div>
+            <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-500"
+                style={{ width: `${course.progress}%` }}
+              />
+            </div>
+            <p className="mt-5 text-sm font-semibold text-slate-700">重点：{course.focus}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{course.plan}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {course.checklist.map((item) => (
+                <span key={item} className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
-    </section>
+        ))}
+      </section>
+    </div>
   );
 }
 
@@ -504,10 +689,12 @@ function StudyPlannerPage({
   setPlanDirection,
   dailyDuration,
   setDailyDuration,
+  plannerDirections,
   generatedPlan,
   generateStudyPlan,
   saveStudyPlan,
   planSaved,
+  customCourse,
 }) {
   return (
     <section className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
@@ -518,12 +705,17 @@ function StudyPlannerPage({
           <p className="mt-3 text-sm leading-6 text-slate-600">
             选择学习方向和每天可投入的时间，系统会生成包含学习内容、练习任务和复盘任务的 7 天计划。
           </p>
+          {customCourse && (
+            <p className="mt-3 rounded-lg bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
+              已根据你的课程“{customCourse}”加入专属计划方向。
+            </p>
+          )}
 
           <div className="mt-6 space-y-5">
             <div>
               <p className="text-sm font-semibold text-slate-700">学习方向</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                {directionOptions.map((direction) => (
+                {plannerDirections.map((direction) => (
                   <button
                     key={direction}
                     type="button"
@@ -652,6 +844,9 @@ function TodosPage({
   deleteTodo,
   completedCount,
   progress,
+  customCourse,
+  suggestedTodos,
+  addSuggestedTodo,
 }) {
   return (
     <section className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
@@ -680,6 +875,25 @@ function TodosPage({
           </form>
         </div>
         <ProgressPanel progress={progress} completedCount={completedCount} total={todos.length} />
+        <div className="rounded-lg border border-white/70 bg-white/90 p-5 shadow-soft backdrop-blur">
+          <p className="text-sm font-semibold text-teal-700">
+            {customCourse ? `${customCourse} 待办建议` : '课程待办建议'}
+          </p>
+          <div className="mt-3 space-y-2">
+            {suggestedTodos.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => addSuggestedTodo(item)}
+                disabled={!customCourse}
+                className="focus-ring flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span>{item}</span>
+                <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-soft backdrop-blur">
@@ -740,12 +954,21 @@ function TodosPage({
   );
 }
 
-function PortfolioPage() {
+function PortfolioPage({ items, customCourse }) {
   const [openItem, setOpenItem] = useState(null);
 
   return (
     <section className="grid gap-5 md:grid-cols-3">
-      {portfolioItems.map((item) => (
+      {customCourse && (
+        <div className="rounded-lg border border-teal-100 bg-teal-50/90 p-6 shadow-soft md:col-span-3">
+          <p className="text-sm font-semibold text-teal-700">当前课程作品线</p>
+          <h2 className="mt-1 text-2xl font-bold text-slate-950">{customCourse}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            下方已自动加入 {customCourse} 的复习档案卡，可以用来承载这门课的笔记、错题和阶段总结。
+          </p>
+        </div>
+      )}
+      {items.map((item) => (
         <div key={item.title} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-soft backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-100 to-sky-100 text-teal-700">
             <BriefcaseBusiness className="h-6 w-6" aria-hidden="true" />
