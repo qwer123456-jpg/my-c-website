@@ -306,7 +306,7 @@ function PageIntro({ title }) {
     <section className="mb-6 rounded-lg border border-white/70 bg-white/88 p-6 shadow-soft backdrop-blur sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-700">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             简洁学习工作台
           </p>
