@@ -1,64 +1,45 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
-  Brain,
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
   Check,
   ChevronRight,
   ClipboardList,
-  Code2,
   FileText,
   GraduationCap,
   Home,
   LayoutDashboard,
-  Layers,
   Plus,
-  Route,
   Save,
-  Search,
-  Sigma,
   Sparkles,
-  Target,
   Trash2,
   TrendingUp,
 } from 'lucide-react';
 
-const storageKey = 'student-study-toolbox.todos';
+const todoStorageKey = 'student-study-toolbox.todos';
 const planStorageKey = 'student-study-toolbox.study-plan';
 
 const initialTodos = [
-  { id: 'todo-1', text: '复习线性代数矩阵相似与特征值', done: false },
-  { id: 'todo-2', text: '整理 Dijkstra 算法模板和例题', done: true },
-  { id: 'todo-3', text: '完成数学建模论文结构草稿', done: false },
-  { id: 'todo-4', text: '用 Python 画一张建模结果图', done: false },
+  { id: 'todo-1', text: '复习线性代数特征值与二次型', done: false },
+  { id: 'todo-2', text: '整理 Python 数据处理笔记', done: true },
+  { id: 'todo-3', text: '完成复变函数留数定理练习', done: false },
+  { id: 'todo-4', text: '复盘常微分方程错题', done: false },
 ];
 
 const navItems = [
   { id: 'home', label: '首页', icon: Home },
-  { id: 'algorithms', label: '算法笔记', icon: Code2 },
-  { id: 'modeling', label: '数学建模', icon: Brain },
   { id: 'courses', label: '课程复习', icon: BookOpen },
   { id: 'planner', label: '学习计划', icon: CalendarDays },
   { id: 'todos', label: '待办清单', icon: ClipboardList },
   { id: 'portfolio', label: '作品展示', icon: BriefcaseBusiness },
 ];
 
-const directionOptions = ['算法', '数学建模', 'Python', '复变函数', '常微分方程'];
+const directionOptions = ['Python', '复变函数', '常微分方程', '线性代数', '英语四级'];
 const durationOptions = ['30分钟', '1小时', '2小时', '3小时'];
 
 const planTemplates = {
-  算法: {
-    content: ['复杂度分析与二分边界', '前缀和与差分模型', '栈、队列与单调结构', 'DFS/BFS 搜索框架', '动态规划状态设计', '最短路与图论建模', '综合题复盘与模板整理'],
-    practice: ['完成 2 道二分题', '写 2 道区间统计题', '完成 1 道单调栈题', '画出搜索树并写代码', '完成 1 道背包题', '实现 Dijkstra 模板', '重做本周错题 3 道'],
-    review: ['总结边界写法', '记录下标偏移问题', '整理常见数据结构用法', '复盘 visited 设计', '写下状态转移来源', '标记建图易错点', '归档算法模板'],
-  },
-  数学建模: {
-    content: ['问题分析与指标拆解', '模型假设与符号说明', '数据清洗与可视化', '评价模型与权重方法', '优化模型与约束设计', '灵敏度分析与检验', '论文结构与摘要打磨'],
-    practice: ['拆解一个校园选题', '写 5 条合理假设', '清洗一份示例表格', '完成一次 TOPSIS 计算', '列出目标函数和约束', '制作误差分析图', '写一版 300 字摘要'],
-    review: ['检查目标是否清晰', '确认假设是否可解释', '记录异常值处理方式', '比较不同权重结果', '复盘约束遗漏点', '总结模型优缺点', '整理论文检查清单'],
-  },
   Python: {
     content: ['语法与函数复习', '列表、字典与推导式', '文件读写与异常处理', 'NumPy 数组计算', 'pandas 数据清洗', 'matplotlib 可视化', '脚本封装与项目整理'],
     practice: ['写 3 个小函数', '处理一组学生成绩', '读取 CSV 并过滤数据', '完成矩阵统计计算', '清洗缺失值和重复值', '画折线图和柱状图', '封装一个自动化脚本'],
@@ -74,77 +55,17 @@ const planTemplates = {
     practice: ['分类 8 个方程', '求解 3 道分离变量题', '完成 2 道常数变易题', '求解齐次与非齐次题', '写特征方程解法', '解一个二维方程组', '完成一套综合练习'],
     review: ['建立分类表', '记录积分常数处理', '复盘通解结构', '整理特解设法', '总结根的不同情况', '标注矩阵指数思路', '整理错题原因'],
   },
+  线性代数: {
+    content: ['矩阵运算与初等变换', '行列式计算', '向量组线性相关', '线性方程组', '特征值与特征向量', '二次型标准化', '综合题型复盘'],
+    practice: ['完成 6 道矩阵运算题', '计算 4 个行列式', '判断向量组相关性', '求解 3 个方程组', '完成 3 道特征值题', '化简 2 个二次型', '重做本周错题'],
+    review: ['记录初等变换规则', '总结展开技巧', '整理秩的判断方法', '复盘解的结构', '归纳相似对角化条件', '标注正定判断方法', '整理公式清单'],
+  },
+  英语四级: {
+    content: ['高频词汇与短语', '听力短对话训练', '长篇阅读定位', '仔细阅读题型', '翻译常用句式', '作文模板与表达', '整套模拟复盘'],
+    practice: ['背诵 40 个高频词', '听 2 组短对话', '完成 1 篇匹配题', '完成 2 篇仔细阅读', '翻译 5 个句子', '写一篇短作文', '完成一套计时练习'],
+    review: ['标记易混词', '记录听力关键词', '总结定位词', '分析错误选项', '整理句式替换', '优化开头结尾', '记录薄弱模块'],
+  },
 };
-
-function loadSavedPlan() {
-  try {
-    const saved = localStorage.getItem(planStorageKey);
-    return saved ? JSON.parse(saved) : null;
-  } catch {
-    return null;
-  }
-}
-
-const algorithmCards = [
-  {
-    title: '二分',
-    tag: '查找与答案判定',
-    icon: Search,
-    detail: '适合有单调性的区间、答案范围和边界定位问题。',
-    example: '例：在有序数组中查找第一个大于等于 x 的位置。',
-    points: ['先写 check 函数', '明确闭区间或半开区间', '用样例验证边界'],
-  },
-  {
-    title: '前缀和',
-    tag: '区间快速求和',
-    icon: Layers,
-    detail: '把重复区间统计转化为一次预处理后的常数时间查询。',
-    example: '例：快速计算第 l 到 r 天的学习时长总和。',
-    points: ['s[i] 表示前 i 项和', '查询用 s[r] - s[l - 1]', '二维题注意容斥'],
-  },
-  {
-    title: '差分',
-    tag: '批量区间修改',
-    icon: TrendingUp,
-    detail: '把区间加减转换为端点变化，最后一次前缀还原。',
-    example: '例：多次给连续日期增加复习强度。',
-    points: ['左端点加值', '右端点后一位减值', '适合离线处理'],
-  },
-  {
-    title: '背包',
-    tag: '动态规划',
-    icon: Target,
-    detail: '用于容量约束下的选择最优值问题，是 DP 入门核心模型。',
-    example: '例：有限复习时间内选择收益最高的章节组合。',
-    points: ['明确状态含义', '区分 01 与完全背包', '滚动数组注意更新顺序'],
-  },
-  {
-    title: 'Dijkstra',
-    tag: '最短路',
-    icon: Route,
-    detail: '解决非负边权图中的单源最短路径，常用于路线和代价问题。',
-    example: '例：求校园地图从宿舍到教学楼的最短时间。',
-    points: ['邻接表建图', '优先队列优化', '边权不能为负'],
-  },
-  {
-    title: 'DFS / BFS',
-    tag: '图与搜索',
-    icon: Brain,
-    detail: 'DFS 适合深度枚举，BFS 适合按层扩展和最短步数。',
-    example: '例：迷宫路径、连通块计数、状态转移搜索。',
-    points: ['设计 visited', '控制递归深度', '队列适合最短步数'],
-  },
-];
-
-const modelingSteps = [
-  ['问题分析', '提取目标、约束、变量和评价指标，明确模型最终要回答什么。'],
-  ['模型假设', '把复杂现实抽象为可计算条件，并说明简化的合理性。'],
-  ['符号说明', '统一变量、参数、单位和取值范围，降低论文阅读成本。'],
-  ['模型建立', '选择优化、统计、预测、评价或仿真方法形成数学表达。'],
-  ['模型求解', '用 Python、MATLAB 或 Excel 完成计算、迭代和可视化。'],
-  ['模型检验', '做灵敏度分析、误差分析和结果解释，证明结论可信。'],
-  ['论文写作', '按摘要、问题重述、模型、结果、优缺点组织表达。'],
-];
 
 const courseCards = [
   {
@@ -152,7 +73,7 @@ const courseCards = [
     progress: 62,
     focus: '解析函数、柯西积分公式、留数定理',
     plan: '每天整理 2 道典型题，重点复盘路径积分和留数计算。',
-    checklist: ['梳理公式条件', '补齐错题标签', '复习典型围道'],
+    checklist: ['公式条件', '典型围道', '极点分类'],
   },
   {
     title: '常微分方程',
@@ -165,15 +86,15 @@ const courseCards = [
     title: 'Python',
     progress: 78,
     focus: '数据处理、可视化、脚本自动化',
-    plan: '用 pandas 重做一次建模数据清洗流程，并输出图表。',
-    checklist: ['DataFrame 操作', 'matplotlib 图表', '脚本封装'],
+    plan: '用 pandas 重做一次数据清洗流程，并输出图表。',
+    checklist: ['DataFrame', 'matplotlib', '脚本封装'],
   },
   {
     title: '线性代数',
     progress: 70,
     focus: '矩阵运算、特征值、二次型',
     plan: '用思维导图串联向量空间、矩阵分解和二次型化简。',
-    checklist: ['行列式计算', '特征值题型', '正交变换'],
+    checklist: ['行列式', '特征值', '正交变换'],
   },
 ];
 
@@ -185,39 +106,49 @@ const portfolioItems = [
     meta: '12 篇周报 · 4 门课程',
   },
   {
-    title: '数学建模项目',
-    category: '竞赛实践',
-    description: '整理问题分析、建模思路、求解代码和论文成果，方便后续迭代。',
-    meta: '3 个案例 · 含图表与代码',
+    title: '课程复习资料',
+    category: '资料整理',
+    description: '把重点公式、题型方法和错题原因放在一起，方便考前快速查阅。',
+    meta: '4 个专题 · 持续更新',
   },
   {
-    title: '算法练习项目',
-    category: '编程训练',
-    description: '汇总常见算法模板、题目标签和复杂度分析，提升刷题效率。',
-    meta: '48 道题 · 6 类模板',
+    title: 'Python 小项目',
+    category: '实践训练',
+    description: '记录数据清洗、可视化和自动化脚本练习，展示学习过程和成果。',
+    meta: '6 个练习 · 含图表',
   },
 ];
 
 function loadTodos() {
   try {
-    const saved = localStorage.getItem(storageKey);
+    const saved = localStorage.getItem(todoStorageKey);
     return saved ? JSON.parse(saved) : initialTodos;
   } catch {
     return initialTodos;
   }
 }
 
+function loadSavedPlan() {
+  try {
+    const saved = localStorage.getItem(planStorageKey);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
+  const savedPlan = loadSavedPlan();
   const [activePage, setActivePage] = useState('home');
   const [todos, setTodos] = useState(loadTodos);
   const [newTodo, setNewTodo] = useState('');
-  const [planDirection, setPlanDirection] = useState('算法');
+  const [planDirection, setPlanDirection] = useState('Python');
   const [dailyDuration, setDailyDuration] = useState('1小时');
-  const [generatedPlan, setGeneratedPlan] = useState(loadSavedPlan);
-  const [planSaved, setPlanSaved] = useState(Boolean(loadSavedPlan()));
+  const [generatedPlan, setGeneratedPlan] = useState(savedPlan);
+  const [planSaved, setPlanSaved] = useState(Boolean(savedPlan));
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(todos));
+    localStorage.setItem(todoStorageKey, JSON.stringify(todos));
   }, [todos]);
 
   const completedCount = todos.filter((todo) => todo.done).length;
@@ -289,8 +220,6 @@ function App() {
         ) : (
           <>
             <PageIntro title={pageTitle} />
-            {activePage === 'algorithms' && <AlgorithmsPage />}
-            {activePage === 'modeling' && <ModelingPage />}
             {activePage === 'courses' && <CoursesPage />}
             {activePage === 'planner' && (
               <StudyPlannerPage
@@ -339,7 +268,7 @@ function Header({ activePage, setActivePage }) {
           </span>
           <span>
             <span className="block text-base font-bold">学习工具箱</span>
-            <span className="block text-xs font-medium text-slate-300">Study Operating System</span>
+            <span className="block text-xs font-medium text-slate-300">Study Toolbox</span>
           </span>
         </button>
 
@@ -376,14 +305,14 @@ function PageIntro({ title }) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-700">
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            高效学习工作台
+            简洁学习工作台
           </p>
           <h1 className="mt-4 text-3xl font-bold tracking-normal text-slate-950 sm:text-4xl">
             {title}
           </h1>
         </div>
         <p className="max-w-xl text-sm leading-6 text-slate-600">
-          用结构化卡片承载重点内容，适合期末复习、竞赛准备和日常自学复盘。
+          聚焦课程复习、计划生成、任务管理和成果整理，减少分散内容，让页面更轻。
         </p>
       </div>
     </section>
@@ -399,30 +328,30 @@ function HomePage({ todos, todayTasks, completedCount, progress, setActivePage }
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-semibold text-teal-100 backdrop-blur">
               <GraduationCap className="h-4 w-4" aria-hidden="true" />
-              为大学生打造的学习中枢
+              为大学生日常复习打造
             </p>
             <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-normal sm:text-6xl">
               大学生学习工具箱
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 sm:text-lg">
-              一个集算法、数学建模、课程复习和任务管理于一体的学习网站，
-              帮你把知识点、复习计划和项目成果整理成清晰的学习工作台。
+              一个聚焦课程复习、学习计划、待办管理和作品整理的轻量学习网站，
+              帮你把每天要学什么、练什么、复盘什么安排清楚。
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => setActivePage('todos')}
+                onClick={() => setActivePage('planner')}
                 className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-teal-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition duration-300 hover:-translate-y-0.5 hover:bg-teal-200"
               >
-                开始管理任务
+                生成学习计划
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 type="button"
-                onClick={() => setActivePage('algorithms')}
+                onClick={() => setActivePage('todos')}
                 className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-white/16"
               >
-                查看算法笔记
+                管理今日任务
               </button>
             </div>
           </div>
@@ -469,11 +398,10 @@ function HomePage({ todos, todayTasks, completedCount, progress, setActivePage }
 
       <section className="grid gap-4 lg:grid-cols-4">
         {[
-          ['算法笔记', '沉淀 C++ 常用算法模板和例题复盘。', Code2, 'algorithms'],
-          ['数学建模', '按竞赛论文流程拆解建模全过程。', Sigma, 'modeling'],
           ['课程复习', '集中整理专业课重点、进度和清单。', BookOpen, 'courses'],
           ['学习计划', '按方向和每日时长生成 7 天行动计划。', CalendarDays, 'planner'],
-          ['作品展示', '把报告、项目和练习成果组合展示。', FileText, 'portfolio'],
+          ['待办清单', '记录今天要完成的复习任务。', ClipboardList, 'todos'],
+          ['作品展示', '把报告、资料和练习成果组合展示。', FileText, 'portfolio'],
         ].map(([title, detail, Icon, page]) => (
           <button
             key={title}
@@ -530,56 +458,6 @@ function ProgressPanel({ progress, completedCount, total }) {
         已完成 {completedCount} 项，共 {total} 项。把任务拆小一些，更容易保持节奏。
       </p>
     </div>
-  );
-}
-
-function AlgorithmsPage() {
-  return (
-    <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {algorithmCards.map((card) => (
-        <ArticleCard key={card.title} {...card}>
-          <div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-            {card.example}
-          </div>
-          <ul className="mt-5 space-y-3">
-            {card.points.map((point) => (
-              <li key={point} className="flex gap-3 text-sm leading-6 text-slate-600">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" aria-hidden="true" />
-                {point}
-              </li>
-            ))}
-          </ul>
-        </ArticleCard>
-      ))}
-    </section>
-  );
-}
-
-function ModelingPage() {
-  return (
-    <section className="rounded-lg border border-white/70 bg-white/90 p-5 shadow-soft backdrop-blur sm:p-8">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-        {modelingSteps.map(([title, detail], index) => (
-          <div
-            key={title}
-            className="group rounded-lg border border-slate-100 bg-gradient-to-b from-white to-slate-50 p-4 transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.12)] xl:min-h-60"
-          >
-            <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-950 text-sm font-bold text-white">
-              {index + 1}
-            </span>
-            <h2 className="mt-5 text-lg font-bold text-slate-950">{title}</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-6 rounded-lg bg-slate-950 p-5 text-white">
-        <p className="text-sm font-semibold text-teal-200">示例任务</p>
-        <p className="mt-2 text-sm leading-6 text-slate-200">
-          以“校园共享单车调度”为题，可以先统计高峰时段需求，再建立供需匹配模型，
-          最后用热力图展示调度建议并在论文中说明模型局限。
-        </p>
-      </div>
-    </section>
   );
 }
 
@@ -883,24 +761,6 @@ function PortfolioPage() {
         </div>
       ))}
     </section>
-  );
-}
-
-function ArticleCard({ title, tag, detail, icon: Icon, children }) {
-  return (
-    <article className="group rounded-lg border border-white/70 bg-white/90 p-6 shadow-soft backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-teal-700">{tag}</p>
-          <h2 className="mt-2 text-2xl font-bold text-slate-950">{title}</h2>
-        </div>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-slate-950 text-white transition duration-300 group-hover:scale-105">
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
-      </div>
-      <p className="mt-4 text-sm leading-6 text-slate-600">{detail}</p>
-      {children}
-    </article>
   );
 }
 
