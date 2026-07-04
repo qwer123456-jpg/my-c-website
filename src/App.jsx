@@ -104,18 +104,21 @@ const portfolioItems = [
     category: '课程总结',
     description: '沉淀每周学习主题、错题反思和阶段复盘，形成可持续复习材料。',
     meta: '12 篇周报 · 4 门课程',
+    details: ['每篇报告包含本周目标、完成情况和问题记录。', '重点整理复变函数、线性代数、Python 和常微分方程。', '适合期末前快速回看学习轨迹。'],
   },
   {
     title: '课程复习资料',
     category: '资料整理',
     description: '把重点公式、题型方法和错题原因放在一起，方便考前快速查阅。',
     meta: '4 个专题 · 持续更新',
+    details: ['按课程拆分公式、题型、易错点三个模块。', '每个专题保留典型题入口和复盘提醒。', '后续可以继续加入 PDF、图片或外部链接。'],
   },
   {
     title: 'Python 小项目',
     category: '实践训练',
     description: '记录数据清洗、可视化和自动化脚本练习，展示学习过程和成果。',
     meta: '6 个练习 · 含图表',
+    details: ['包含 CSV 清洗、成绩统计、图表生成等小练习。', '每个练习记录输入数据、处理步骤和输出结果。', '适合作为课程作业或简历素材的雏形。'],
   },
 ];
 
@@ -738,6 +741,8 @@ function TodosPage({
 }
 
 function PortfolioPage() {
+  const [openItem, setOpenItem] = useState(null);
+
   return (
     <section className="grid gap-5 md:grid-cols-3">
       {portfolioItems.map((item) => (
@@ -753,11 +758,29 @@ function PortfolioPage() {
           </p>
           <button
             type="button"
+            onClick={() => setOpenItem(openItem === item.title ? null : item.title)}
+            aria-expanded={openItem === item.title}
             className="focus-ring mt-6 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
           >
-            查看详情
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            {openItem === item.title ? '收起详情' : '查看详情'}
+            <ChevronRight
+              className={`h-4 w-4 transition ${openItem === item.title ? 'rotate-90' : ''}`}
+              aria-hidden="true"
+            />
           </button>
+          {openItem === item.title && (
+            <div className="mt-5 rounded-lg border border-teal-100 bg-teal-50/70 p-4">
+              <p className="text-sm font-bold text-teal-800">详情内容</p>
+              <ul className="mt-3 space-y-2">
+                {item.details.map((detail) => (
+                  <li key={detail} className="flex gap-2 text-sm leading-6 text-slate-700">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" aria-hidden="true" />
+                    {detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       ))}
     </section>
