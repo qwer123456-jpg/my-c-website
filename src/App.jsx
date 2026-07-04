@@ -430,7 +430,7 @@ function PageIntro({ title }) {
         <div>
           <p className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            简洁学习工作台
+            AI 辅助学习
           </p>
           <h1 className="mt-4 text-3xl font-bold tracking-normal text-slate-950 sm:text-4xl">
             {title}
