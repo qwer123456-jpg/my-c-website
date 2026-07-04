@@ -21,6 +21,7 @@ import {
 const todoStorageKey = 'student-study-toolbox.todos';
 const planStorageKey = 'student-study-toolbox.study-plan';
 const courseStorageKey = 'student-study-toolbox.custom-course';
+const courseReviewStorageKey = 'student-study-toolbox.course-review';
 
 const initialTodos = [];
 
@@ -144,6 +145,15 @@ function loadCustomCourse() {
   }
 }
 
+function loadCustomCourseReview() {
+  try {
+    const saved = localStorage.getItem(courseReviewStorageKey);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 function createCourseCard(courseName) {
   return {
     title: courseName,
@@ -209,17 +219,21 @@ function createPortfolioItems(courseName) {
 function App() {
   const savedPlan = loadSavedPlan();
   const savedCourse = loadCustomCourse();
+  const savedCourseReview = loadCustomCourseReview();
   const [activePage, setActivePage] = useState('home');
   const [todos, setTodos] = useState(loadTodos);
   const [newTodo, setNewTodo] = useState('');
   const [customCourse, setCustomCourse] = useState(savedCourse);
   const [courseDraft, setCourseDraft] = useState(savedCourse);
+  const [customCourseReview, setCustomCourseReview] = useState(savedCourseReview);
   const [planDirection, setPlanDirection] = useState('Python');
   const [dailyDuration, setDailyDuration] = useState('1小时');
   const [generatedPlan, setGeneratedPlan] = useState(savedPlan);
   const [planSaved, setPlanSaved] = useState(Boolean(savedPlan));
   const [aiLoading, setAiLoading] = useState(false);
+  const [courseAiLoading, setCourseAiLoading] = useState(false);
   const [planError, setPlanError] = useState('');
+  const [courseError, setCourseError] = useState('');
 
   useEffect(() => {
     localStorage.setItem(todoStorageKey, JSON.stringify(todos));
@@ -229,12 +243,26 @@ function App() {
     localStorage.setItem(courseStorageKey, customCourse);
   }, [customCourse]);
 
+  useEffect(() => {
+    if (customCourseReview) {
+      localStorage.setItem(courseReviewStorageKey, JSON.stringify(customCourseReview));
+    } else {
+      localStorage.removeItem(courseReviewStorageKey);
+    }
+  }, [customCourseReview]);
+
   const completedCount = todos.filter((todo) => todo.done).length;
   const progress = todos.length ? Math.round((completedCount / todos.length) * 100) : 0;
   const todayTasks = useMemo(() => todos.filter((todo) => !todo.done).slice(0, 4), [todos]);
   const pageTitle = navItems.find((item) => item.id === activePage)?.label ?? '首页';
+  const customCourseCard =
+    customCourse && customCourseReview?.title === customCourse
+      ? customCourseReview
+      : customCourse
+        ? createCourseCard(customCourse)
+        : null;
   const courseList = customCourse
-    ? [createCourseCard(customCourse), ...courseCards.filter((course) => course.title !== customCourse)]
+    ? [customCourseCard, ...courseCards.filter((course) => course.title !== customCourse)]
     : courseCards;
   const plannerDirections = customCourse
     ? [customCourse, ...directionOptions.filter((direction) => direction !== customCourse)]
@@ -278,8 +306,64 @@ function App() {
     if (!courseName) return;
 
     setCustomCourse(courseName);
+    setCustomCourseReview({ ...createCourseCard(courseName), source: 'local' });
+    setPlanDirection(courseName);
+    setCourseError('');
+    setActivePage('courses');
+  }
+
+  async function generateAiCourseReview(event) {
+    event.preventDefault();
+    const courseName = courseDraft.trim();
+    if (!courseName) return;
+
+    setCourseAiLoading(true);
+    setCourseError('');
+    setCustomCourse(courseName);
     setPlanDirection(courseName);
     setActivePage('courses');
+
+    try {
+      const response = await fetch('/api/generate-course', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course: courseName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI course review unavailable');
+      }
+
+      const review = await response.json();
+      setCustomCourseReview({
+        title: review.title || courseName,
+        progress: Number(review.progress) || 40,
+        focus: review.focus || `${courseName} 的核心概念、常见题型、课堂笔记和错题整理`,
+        plan: review.plan || `先把 ${courseName} 的章节目录拆成 3-5 个模块，再按知识点、例题、错题、总结推进复习。`,
+        checklist: Array.isArray(review.checklist) && review.checklist.length
+          ? review.checklist.slice(0, 5)
+          : ['章节梳理', '典型例题', '错题复盘'],
+        source: review.source || 'ai',
+      });
+    } catch {
+      setCustomCourseReview({ ...createCourseCard(courseName), source: 'fallback' });
+      setCourseError('AI 生成暂时不可用，已自动使用本地模板生成课程复习内容。');
+    } finally {
+      setCourseAiLoading(false);
+    }
+  }
+
+  function deleteCustomCourse() {
+    setCustomCourse('');
+    setCourseDraft('');
+    setCustomCourseReview(null);
+    setPlanDirection('Python');
+    setCourseError('');
+    if (generatedPlan?.direction === customCourse) {
+      setGeneratedPlan(null);
+      setPlanSaved(false);
+      localStorage.removeItem(planStorageKey);
+    }
   }
 
   function addSuggestedTodo(text) {
@@ -361,6 +445,9 @@ function App() {
             courseDraft={courseDraft}
             setCourseDraft={setCourseDraft}
             saveCourse={saveCourse}
+            generateAiCourseReview={generateAiCourseReview}
+            courseAiLoading={courseAiLoading}
+            courseError={courseError}
           />
         ) : (
           <>
@@ -372,6 +459,10 @@ function App() {
                 courseDraft={courseDraft}
                 setCourseDraft={setCourseDraft}
                 saveCourse={saveCourse}
+                generateAiCourseReview={generateAiCourseReview}
+                courseAiLoading={courseAiLoading}
+                courseError={courseError}
+                deleteCustomCourse={deleteCustomCourse}
               />
             )}
             {activePage === 'planner' && (
@@ -480,10 +571,18 @@ function PageIntro({ title }) {
   );
 }
 
-function CourseInputPanel({ customCourse, courseDraft, setCourseDraft, saveCourse }) {
+function CourseInputPanel({
+  customCourse,
+  courseDraft,
+  setCourseDraft,
+  saveCourse,
+  generateAiCourseReview,
+  courseAiLoading,
+  courseError,
+}) {
   return (
     <form
-      onSubmit={saveCourse}
+      onSubmit={generateAiCourseReview}
       className="rounded-lg border border-white/70 bg-white/90 p-5 shadow-soft backdrop-blur"
     >
       <p className="text-sm font-semibold text-teal-700">我的课程</p>
@@ -497,11 +596,25 @@ function CourseInputPanel({ customCourse, courseDraft, setCourseDraft, saveCours
         />
         <button
           type="submit"
-          className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+          disabled={courseAiLoading}
+          className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"
         >
-          生成课程面板
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          {courseAiLoading ? 'AI 生成中...' : 'AI 生成课程面板'}
+        </button>
+        <button
+          type="button"
+          onClick={saveCourse}
+          className="focus-ring inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+        >
+          本地模板
         </button>
       </div>
+      {courseError && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          {courseError}
+        </p>
+      )}
       <p className="mt-3 text-sm text-slate-500">
         {customCourse
           ? `当前课程：${customCourse}。课程复习、学习计划、待办建议和作品展示都会跟随它变化。`
@@ -521,6 +634,9 @@ function HomePage({
   courseDraft,
   setCourseDraft,
   saveCourse,
+  generateAiCourseReview,
+  courseAiLoading,
+  courseError,
 }) {
   return (
     <div className="space-y-6">
@@ -603,6 +719,9 @@ function HomePage({
         courseDraft={courseDraft}
         setCourseDraft={setCourseDraft}
         saveCourse={saveCourse}
+        generateAiCourseReview={generateAiCourseReview}
+        courseAiLoading={courseAiLoading}
+        courseError={courseError}
       />
 
       <section className="grid gap-4 lg:grid-cols-4">
@@ -670,7 +789,17 @@ function ProgressPanel({ progress, completedCount, total }) {
   );
 }
 
-function CoursesPage({ courses, customCourse, courseDraft, setCourseDraft, saveCourse }) {
+function CoursesPage({
+  courses,
+  customCourse,
+  courseDraft,
+  setCourseDraft,
+  saveCourse,
+  generateAiCourseReview,
+  courseAiLoading,
+  courseError,
+  deleteCustomCourse,
+}) {
   return (
     <div className="space-y-5">
       <CourseInputPanel
@@ -678,6 +807,9 @@ function CoursesPage({ courses, customCourse, courseDraft, setCourseDraft, saveC
         courseDraft={courseDraft}
         setCourseDraft={setCourseDraft}
         saveCourse={saveCourse}
+        generateAiCourseReview={generateAiCourseReview}
+        courseAiLoading={courseAiLoading}
+        courseError={courseError}
       />
       <section className="grid gap-5 md:grid-cols-2">
         {courses.map((course) => (
@@ -689,10 +821,27 @@ function CoursesPage({ courses, customCourse, courseDraft, setCourseDraft, saveC
                 </p>
                 <h2 className="mt-1 text-2xl font-bold text-slate-950">{course.title}</h2>
               </div>
-              <span className="rounded-full bg-slate-950 px-3 py-1 text-sm font-bold text-white">
-                {course.progress}%
-              </span>
+              <div className="flex flex-col items-end gap-2">
+                <span className="rounded-full bg-slate-950 px-3 py-1 text-sm font-bold text-white">
+                  {course.progress}%
+                </span>
+                {course.title === customCourse && (
+                  <button
+                    type="button"
+                    onClick={deleteCustomCourse}
+                    className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 transition hover:border-rose-200 hover:bg-rose-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    删除课程
+                  </button>
+                )}
+              </div>
             </div>
+            {course.title === customCourse && course.source && (
+              <p className="mt-3 inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+                {course.source === 'ai' ? 'AI 生成' : '本地模板'}
+              </p>
+            )}
             <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-500"
